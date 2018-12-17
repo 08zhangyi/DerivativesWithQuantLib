@@ -102,8 +102,8 @@ class EuropeanOptionBSM(EuropeanOption):
         volatility = ql.BlackConstantVol(self.evaluationDate, self.calendar, ql.QuoteHandle(self.volatility), ql.Actual365Fixed())
         # 定义价格发展过程
         process = ql.BlackScholesMertonProcess(ql.QuoteHandle(self.stockPrice),
-                                               ql.YieldTermStructureHandle(riskFreeCurve),
                                                ql.YieldTermStructureHandle(dividendRateCurve),
+                                               ql.YieldTermStructureHandle(riskFreeCurve),
                                                ql.BlackVolTermStructureHandle(volatility))
         # 定义价格引擎
         engine = ql.AnalyticEuropeanEngine(process)

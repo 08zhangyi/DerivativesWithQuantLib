@@ -160,8 +160,8 @@ class ETF50OptionAnalysis(OptionAnalysisBase):
 
 
 if __name__ == '__main__':
-    options = {'10001555.SH': 1, '10001546.SH': 1, '10001547.SH': -1}
-    etf = 0
-    unit = 10000
+    options = {'10001369.SH': -1}
+    etf = 10200
+    unit = 10200
     tool = ETF50OptionAnalysis(options, etf=etf, unit=unit)
     tool.summary()

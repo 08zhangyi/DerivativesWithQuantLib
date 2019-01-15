@@ -52,11 +52,12 @@ class SingleAssetPathGenerator(PathGenerator):
     def _get_return_everyday(self):
         # len(self.date_list)行，self.path_number)条路径
         # 收益率用每日对数收益率表示
-        # 此函数为通过生成每日汇报来生成路径的核心函数
+        # 此函数为通过生成每日回报来生成路径的核心函数
         return_everyday = np.zeros((len(self.date_list), self.path_number))  # 每日价格不变
         return return_everyday
 
     def _get_path_everyday(self):
+        # 此函数为通过生成每日价格变动来生成路径的核心函数
         return_everyday = self._get_return_everyday()
         return_everyday = np.cumsum(return_everyday, axis=0)
         path_everyday = np.exp(return_everyday)

@@ -7,7 +7,7 @@ from scipy.optimize import minimize
 import matplotlib.pyplot as plt
 from matplotlib.dates import DateFormatter
 from tools import str_date_2_ql_date
-from 上交所回购日行情分析 import get_shanghai_repo
+from 上交所回购日行情分析 import get_shanghai_repo_1m
 
 
 def get_treasury_bond_ytm(date):
@@ -20,7 +20,8 @@ def get_treasury_bond_ytm(date):
     workbook = xlrd.open_workbook('data\\债券日行情' + date + '.xlsx')
     main_sheet = workbook.sheet_by_name('万得')
     nrows_range = range(2, main_sheet.nrows - 2)  # 有效信息的行范围
-    locaotion_dict = {'交易代码': 0, '收盘全价': 3, '债券类型': 22, '特殊条款': 29, '利率类型': 30, '成交量': 4}  # 有效信息的列范围
+    locaotion_dict = {'交易代码': 0, '收盘全价': 3, '债券类型': 22, '特殊条款': 29, '利率类型': 30, '成交量': 4,
+                      '交易市场': 23}  # 有效信息的列范围
     debt_list = []  # 记录代码，全价信息
     for i in nrows_range:
         # 按照国债、无特殊条款、固定利率的条件筛选债券品种
@@ -41,6 +42,8 @@ def get_treasury_bond_ytm(date):
     bond_helpers = []
     for i in range(len(debt_codes)):
         debt_data_temp = debt_data[i]
+        # if debt_data_temp[1].date() < (calc_date + ql.Period(-1, ql.Years)).to_date():  # 剔除发行期超过一年的老债
+        #     continue
         issue_date = str_date_2_ql_date(debt_data_temp[1].strftime('%Y-%m-%d'))
         maturity_date = str_date_2_ql_date(debt_data_temp[2].strftime('%Y-%m-%d'))
         # print(debt_data_temp)
@@ -73,11 +76,10 @@ def get_treasury_bond_ytm(date):
         bond_helpers.append(bond_helper)
 
     # 构造虚拟的零息票债券，调整零息票债券报价，进而调整YTM曲线
+    # 短期限的债券品种如果过多地话，会造成估计曲线的非光滑性，因此时间间隔较长
     dayCount = ql.ActualActual()
-    fictitious_bonds_term = [ql.Period(6, ql.Months), ql.Period(9, ql.Months), ql.Period(1, ql.Years),
-                             ql.Period(2, ql.Years), ql.Period(3, ql.Years), ql.Period(4, ql.Years),
-                             ql.Period(5, ql.Years),
-                             ql.Period(7, ql.Years), ql.Period(10, ql.Years), ql.Period(15, ql.Years),
+    fictitious_bonds_term = [ql.Period(1, ql.Years), ql.Period(2, ql.Years), ql.Period(3, ql.Years), ql.Period(4, ql.Years),
+                             ql.Period(5, ql.Years), ql.Period(7, ql.Years), ql.Period(10, ql.Years), ql.Period(15, ql.Years),
                              ql.Period(20, ql.Years), ql.Period(30, ql.Years)]
     fictitious_bonds = [ql.ZeroCouponBond(0, calendar, 100.0, calc_date + t, bussiness_convention, 100.0, calc_date) for
                         t in fictitious_bonds_term]
@@ -86,8 +88,9 @@ def get_treasury_bond_ytm(date):
     fictitious_bonds_init_prices_quote_handle = [ql.QuoteHandle(q) for q in fictitious_bonds_init_prices_quote]
     ficitious_bonds_helper = [ql.BondHelper(p, b, useCleanPrice=False) for p, b in
                               zip(fictitious_bonds_init_prices_quote_handle, fictitious_bonds)]
-    repo_rate_helpers = get_shanghai_repo(date)
+    repo_rate_helpers = get_shanghai_repo_1m(date)  # 回购利率作为短期利率
     all_helpers = repo_rate_helpers + ficitious_bonds_helper
+    # all_helpers = ficitious_bonds_helper
     # 定义不同插值方法的YTM曲线
     # ficitious_ytm_curve = ql.PiecewiseLogLinearDiscount(calc_date, all_helpers, dayCount)
     ficitious_ytm_curve = ql.PiecewiseLogCubicDiscount(calc_date, all_helpers, dayCount)
@@ -101,6 +104,7 @@ def get_treasury_bond_ytm(date):
     def calculate_diff(zero_prices):
         # zero_prices为虚拟的零息债券的报价
         # zero_prices的size与fictitious_bonds_term一致
+        print(zero_prices)
         debt_volumes = np.array([v[2] for v in debt_list])
         debt_volumes = debt_volumes / np.sum(debt_volumes)  # 归一化权重
         diff = 0.0  # 测算误差
@@ -125,7 +129,7 @@ def get_treasury_bond_ytm(date):
     zero_rates = [ficitious_ytm_curve.zeroRate(calc_date + t, dayCount, ql.Compounded).rate() for t in fictitious_bonds_term]
     print(zero_rates)
     # 展示不同时期的零息国债收益率曲线
-    need_maturity = [calc_date + ql.Period(i, ql.Months) for i in range(1, 361)]
+    need_maturity = [calc_date + ql.Period(i, ql.Months) for i in range(0, 361)]
     zero_rates = [ficitious_ytm_curve.zeroRate(maturity, dayCount, ql.Compounded).rate() for maturity in need_maturity]
     need_maturity = [d.to_date() for d in need_maturity]
     fig = plt.figure()
@@ -133,8 +137,12 @@ def get_treasury_bond_ytm(date):
     ax.xaxis.set_major_formatter(DateFormatter('%Y-%m-%d'))
     plt.xticks(need_maturity[::12], rotation=45)
     plt.plot(need_maturity, zero_rates)
+    plt.rcParams['font.family'] = ['sans-serif']
+    plt.rcParams['font.sans-serif'] = ['SimHei']
+    plt.rcParams['axes.unicode_minus'] = False
+    plt.title(date+'日零息票国债到期收益率拟合曲线图')
     plt.show()
     return ficitious_ytm_curve
 
 
-get_treasury_bond_ytm('2019-01-21')
+get_treasury_bond_ytm('2018-12-25')

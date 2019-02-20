@@ -5,6 +5,7 @@ from WindPy import w
 
 
 class PathGenerator(object):
+    # 仿真路径生成器基类
     def __init__(self, start_date, end_date, path_number):
         start_date = self._date_string_2_date_ql(start_date)  # 路径生成的初始时间
         end_date = self._date_string_2_date_ql(end_date)  # 路径生成的结束时间
@@ -43,7 +44,7 @@ class PathGenerator(object):
         return date_list
 
 
-class SingleAssetPathGenerator(PathGenerator):
+class SingleAssetPathGeneratorByErerydayReturn(PathGenerator):
     def __init__(self, asset, start_date, end_date, path_number):
         super().__init__(start_date, end_date, path_number)
         self.asset = asset
@@ -69,9 +70,60 @@ class SingleAssetPathGenerator(PathGenerator):
         return path_everyday
 
 
+class HistoryReturnPathGeneratorByEverydayReturn(SingleAssetPathGeneratorByErerydayReturn):
+    # 使用历史收益率数据构造仿真路径
+    def __init__(self, asset, start_date, end_date, path_number, history_end_date, history_frequrncy=0):
+        self.history_end_date = history_end_date  # 历史路径的最后采样日
+        self.history_frequency = history_frequrncy  # 历史路径的采样频率：0-收尾相接，1-年频率，2-月频率，3-季度频率，4-周频率
+        super().__init__(asset, start_date, end_date, path_number)
+
+    def _get_return_everyday(self):
+        return_data_list = []
+        calendar = ql.China()
+        # 初始化end_date和start_date
+        end_date = self._date_string_2_date_ql(self.history_end_date)
+        start_date = calendar.advance(end_date, -len(self.date_list)+1, ql.Days)
+        for pn in range(self.path_number):
+            w.start()
+            print('获取第'+str(pn+1)+'条历史路径，共计'+str(self.path_number)+'条，日期为从'+str(start_date)+'到'+str(end_date))
+            return_data = np.array(w.wsd(self.asset, "pct_chg", self._date_ql_2_date_string(start_date), self._date_ql_2_date_string(end_date), "ShowBlank=0").Data[0])
+            return_data = np.log((return_data / 100.0 + 1.0))[:, np.newaxis]
+            return_data[0, :] = 0.0  # 第一天收盘为初始交易时刻
+            return_data_list.append(return_data)
+            if self.history_frequency == 1:  # 一年
+                end_date = calendar.advance(end_date, -1, ql.Years)
+            elif self.history_frequency == 2:  # 一个月
+                end_date = calendar.advance(end_date, -1, ql.Months)
+            elif self.history_frequency == 3:  # 一个季度
+                end_date = calendar.advance(end_date, -3, ql.Months)
+            elif self.history_frequency == 4:  # 一周
+                end_date = calendar.advance(end_date, -1, ql.Weeks)
+            else:  # 0为默认模式
+                end_date = start_date
+            start_date = calendar.advance(end_date, -len(self.date_list) + 1, ql.Days)
+        return_everyday = np.concatenate(return_data_list, axis=1)  # 每日价格不变
+        return return_everyday
+
+
+class BrownianMCReturnPathGeneratorByEverydayReturn(SingleAssetPathGeneratorByErerydayReturn):
+    def __init__(self, asset, start_date, end_date, path_number, drift, volatility):
+        # 使用正态分布生成收益率数据
+        # Brownian运动的参数，240天的年化
+        self.volatility = volatility / np.sqrt(240)
+        self.drift = drift / 240
+        super().__init__(asset, start_date, end_date, path_number)
+
+    def _get_return_everyday(self):
+        return_everyday = np.random.normal(self.drift, self.volatility, size=(len(self.date_list), self.path_number))
+        return_everyday[0, :] = 0.0
+        return return_everyday
+
+
 if __name__ == '__main__':
     asset = '000001.SH'
     start_date = '2018-09-14'
     end_date = '2018-10-12'
+    history_end_date = '2018-10-12'
     path_number = 10
-    generator = SingleAssetPathGenerator(asset, start_date, end_date, path_number)
+    generator = BrownianMCReturnPathGeneratorByEverydayReturn(asset, start_date, end_date, path_number, 0.0, 0.2)
+    print(generator.get_date())

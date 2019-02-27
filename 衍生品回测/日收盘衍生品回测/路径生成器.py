@@ -126,4 +126,5 @@ if __name__ == '__main__':
     history_end_date = '2018-10-12'
     path_number = 10
     generator = BrownianMCReturnPathGeneratorByEverydayReturn(asset, start_date, end_date, path_number, 0.0, 0.2)
-    print(generator.get_date())
+    sim_path = generator.get_date()
+    print(sim_path.index.values)

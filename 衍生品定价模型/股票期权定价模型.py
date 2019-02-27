@@ -365,3 +365,13 @@ if __name__ == '__main__':
     model = AmericanOptionBSMMonteCarlo(stockPrice, strikePrice, evaluationDate, maturityDate, optionType, dividendRate, riskFree, volatility)
     print(model.value())
     print(model.delta())
+
+    stockPrice = 1.0
+    strikePrice = 0.0
+    evaluationDate = '2019-02-27'
+    exerciseDate = '2019-02-27'
+    optionType = ql.Option.Call
+    riskFree = 0.01
+    volatility = 0.2
+    model = EuropeanOptionBSAnalytic(stockPrice, strikePrice, evaluationDate, exerciseDate, optionType, riskFree, volatility)
+    print(model.value())

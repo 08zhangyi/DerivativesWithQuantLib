@@ -48,7 +48,6 @@ class SingleAssetPathGeneratorByErerydayReturn(PathGenerator):
     def __init__(self, asset, start_date, end_date, path_number):
         super().__init__(start_date, end_date, path_number)
         self.asset = asset
-        self._get_path_everyday()
 
     def _get_return_everyday(self):
         # len(self.date_list)行，self.path_number)条路径
@@ -65,13 +64,13 @@ class SingleAssetPathGeneratorByErerydayReturn(PathGenerator):
         path_everyday = pd.DataFrame(path_everyday, index=self.date_list)
         return path_everyday
 
-    def get_date(self):
+    def get_data(self):
         path_everyday = self._get_path_everyday()
         return path_everyday
 
 
 class HistoryReturnPathGeneratorByEverydayReturn(SingleAssetPathGeneratorByErerydayReturn):
-    # 使用历史收益率数据构造仿真路径
+    # 使用历史收益率数据构造仿真路径，初始价格为1.0
     def __init__(self, asset, start_date, end_date, path_number, history_end_date, history_frequrncy=0):
         self.history_end_date = history_end_date  # 历史路径的最后采样日
         self.history_frequency = history_frequrncy  # 历史路径的采样频率：0-收尾相接，1-年频率，2-月频率，3-季度频率，4-周频率
@@ -98,7 +97,7 @@ class HistoryReturnPathGeneratorByEverydayReturn(SingleAssetPathGeneratorByErery
                 end_date = calendar.advance(end_date, -3, ql.Months)
             elif self.history_frequency == 4:  # 一周
                 end_date = calendar.advance(end_date, -1, ql.Weeks)
-            else:  # 0为默认模式
+            else:  # 0为默认模式，收尾相接模式
                 end_date = start_date
             start_date = calendar.advance(end_date, -len(self.date_list) + 1, ql.Days)
         return_everyday = np.concatenate(return_data_list, axis=1)  # 每日价格不变
@@ -107,7 +106,7 @@ class HistoryReturnPathGeneratorByEverydayReturn(SingleAssetPathGeneratorByErery
 
 class BrownianMCReturnPathGeneratorByEverydayReturn(SingleAssetPathGeneratorByErerydayReturn):
     def __init__(self, asset, start_date, end_date, path_number, drift, volatility):
-        # 使用正态分布生成收益率数据
+        # 使用正态分布生成收益率数据，，初始价格为1.0
         # Brownian运动的参数，240天的年化
         self.volatility = volatility / np.sqrt(240)
         self.drift = drift / 240
@@ -120,11 +119,11 @@ class BrownianMCReturnPathGeneratorByEverydayReturn(SingleAssetPathGeneratorByEr
 
 
 if __name__ == '__main__':
-    asset = '000001.SH'
+    asset = '000300.SH'
     start_date = '2018-09-14'
     end_date = '2018-10-12'
     history_end_date = '2018-10-12'
     path_number = 10
-    generator = BrownianMCReturnPathGeneratorByEverydayReturn(asset, start_date, end_date, path_number, 0.0, 0.2)
-    sim_path = generator.get_date()
-    print(sim_path.index.values)
+    generator = HistoryReturnPathGeneratorByEverydayReturn(asset, start_date, end_date, path_number, history_end_date)
+    sim_path = generator.get_data()
+    print(sim_path)

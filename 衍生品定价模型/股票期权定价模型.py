@@ -1,5 +1,6 @@
 import QuantLib as ql
 import random
+import numpy as np
 from abc import abstractmethod, ABCMeta
 
 
@@ -342,6 +343,117 @@ class AmericanOptionBSMMonteCarlo(AmericanOptionBSMBinomial):
         engine = ql.MCAmericanEngine(self.process, 'PseudoRandom', timeSteps=self.maturityDate-self.evaluationDate, antitheticVariate=True,
                                      requiredSamples=requiredSamples, seed=seed)
         return engine
+
+    def delta(self, eps=EPS):
+        # eps为差分计算delta时价格的差分变动比例
+        value_p = self.NPV(self.stockPrice.value()*(1 + eps), self.dividendRate.value(), self.riskFree.value(),
+                           self.volatility.value())
+        value_m = self.NPV(self.stockPrice.value() * (1 - eps), self.dividendRate.value(), self.riskFree.value(),
+                           self.volatility.value())
+        delta = (value_p - value_m) / (2 * eps * self.stockPrice.value())
+        return delta
+
+
+# 离散平均亚式股票期权的基类
+class DiscreteAveragingAsiannOption(Option):
+    __metaclass__ = ABCMeta  # 抽象类声明
+
+    def __init__(self, stockPrice, strikePrice, evaluationDate, exerciseDate, optionType, averageType, historyPrices):
+        # 输入参数为期权条款本身
+        # optionType为ql.Option.Call或ql.Option.Put
+        # averageType为ql.Average.Arithmetic或ql.Average.Geometric
+        # historyPrices为历史价格列表，可以为[]、[1, 1.2, 1.03, 0.97]等形式
+        super().__init__(stockPrice, evaluationDate)
+        self.strikePrice = strikePrice  # 敲定价不用ql.SimpleQuote包装，Payoff不支持
+        self.exerciseDate = self.str2date(exerciseDate)
+        self.optionType = optionType
+        self.averageType = averageType
+        self.historyPrices = historyPrices
+        # 构造期权
+        # evaluationDate如果是第一天盘中，则historyPrices为[]
+        # 否则，historyPrices的最后一项应为evaluationDate的收盘价
+        runningAccumulator, pastFixings = self._get_accumulator()
+        fixingDates = self._get_fixing_dates()
+        self.option = ql.DiscreteAveragingAsianOption(self.averageType,
+                                                      runningAccumulator,
+                                                      pastFixings,
+                                                      fixingDates,
+                                                      ql.PlainVanillaPayoff(self.optionType, self.strikePrice),
+                                                      ql.EuropeanExercise(self.exerciseDate))
+
+    def _get_accumulator(self):
+        # 根据历史价格构造runningAccumulator和pastFixings
+        pastFixings = len(self.historyPrices)
+        if self.averageType == ql.Average.Geometric:
+            runningAccumulator = np.exp(np.sum(np.log(self.historyPrices)))
+        else:
+            runningAccumulator = np.sum(self.historyPrices)
+        return runningAccumulator, pastFixings
+
+    def _get_fixing_dates(self):
+        fixingDates = []
+        for i in range(self.calendar.businessDaysBetween(self.evaluationDate, self.exerciseDate)):
+            fixingDates.append(self.calendar.advance(self.evaluationDate, i + 1, ql.Days))
+        return fixingDates
+
+
+# 离散平均价格亚式股票期权BSM定价模型-蒙特卡洛求解
+class DiscreteArithmeticAveragingPriceAsiannOptionBSMMonteCarlo(DiscreteAveragingAsiannOption):
+    def __init__(self, stockPrice, strikePrice, evaluationDate, exerciseDate, optionType, historyPrices, dividendRate, riskFree, volatility):
+        averageType = ql.Average.Arithmetic
+        super().__init__(stockPrice, strikePrice, evaluationDate, exerciseDate, optionType, averageType, historyPrices)
+        self.riskFree = ql.SimpleQuote(riskFree)
+        self.volatility = ql.SimpleQuote(volatility)
+        self.dividendRate = ql.SimpleQuote(dividendRate)
+        self.process = self.getPricingProcess()
+        # 定义价格引擎
+        engine = self.getPricingEngine()
+        self.option.setPricingEngine(engine)
+
+    def getPricingProcess(self):
+        # 构造无风险利率、分红和波动率曲线
+        dividendRateCurve = ql.FlatForward(self.evaluationDate, ql.QuoteHandle(self.dividendRate), ql.Actual365Fixed())
+        riskFreeCurve = ql.FlatForward(self.evaluationDate, ql.QuoteHandle(self.riskFree), ql.ActualActual())
+        volatility = ql.BlackConstantVol(self.evaluationDate, self.calendar, ql.QuoteHandle(self.volatility),
+                                         ql.Actual365Fixed())
+        # 定义价格发展过程
+        process = ql.BlackScholesMertonProcess(ql.QuoteHandle(self.stockPrice),
+                                               ql.YieldTermStructureHandle(dividendRateCurve),
+                                               ql.YieldTermStructureHandle(riskFreeCurve),
+                                               ql.BlackVolTermStructureHandle(volatility))
+        return process
+
+    def getPricingEngine(self):
+        # 'pseudorandom'为具体的RNG类型
+        # MonteCarlo方法的参数
+        requiredSamples = MC_SAMPLE_NUMBER
+        seed = random.randint(0, 100000000)
+        engine = ql.MCDiscreteArithmeticAPEngine(self.process, 'pseudorandom', antitheticVariate=True, requiredSamples=requiredSamples, seed=seed)
+        return engine
+
+    def NPV(self, stockPrice, dividendRate, riskFree, volatility):
+        # 记录现在的价格
+        stockPriceNow = self.stockPrice.value()
+        dividendRateNow = self.dividendRate.value()
+        riskFreeNow = self.riskFree.value()
+        volatilityNow = self.volatility.value()
+        # 更新相关的计算参数
+        self.stockPrice.setValue(stockPrice)
+        self.dividendRate.setValue(dividendRate)
+        self.riskFree.setValue(riskFree)
+        self.volatility.setValue(volatility)
+        NPVValue = self.option.NPV()
+        # 恢复原参数
+        self.stockPrice.setValue(stockPriceNow)
+        self.dividendRate.setValue(dividendRateNow)
+        self.riskFree.setValue(riskFreeNow)
+        self.volatility.setValue(volatilityNow)
+        return NPVValue
+
+    def value(self):
+        value = self.NPV(self.stockPrice.value(), self.dividendRate.value(), self.riskFree.value(),
+                         self.volatility.value())
+        return value
 
     def delta(self, eps=EPS):
         # eps为差分计算delta时价格的差分变动比例

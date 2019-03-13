@@ -153,13 +153,19 @@ class EuropeanOptionBSMAnalytic(EuropeanOptionBSAnalytic):
 
 # 连续分红股票欧式期权的BSM蒙特卡洛定价模型
 class EuropeanOptionBSMMonteCarlo(EuropeanOptionBSMAnalytic):
+    def __init__(self, stockPrice, strikePrice, evaluationDate, exerciseDate, optionType, dividendRate, riskFree, volatility, seed=None, requiredSamples=MC_SAMPLE_NUMBER):
+        # MC参数设定
+        if seed is None:
+            self.seed = random.randint(0, 100000000)
+        else:
+            self.seed = seed
+        self.requiredSamples = requiredSamples
+        super().__init__(stockPrice, strikePrice, evaluationDate, exerciseDate, optionType, dividendRate, riskFree, volatility)
+
     def getPricingEngine(self):
-        # MonteCarlo方法的参数
-        requiredSamples = MC_SAMPLE_NUMBER
-        seed = random.randint(0, 100000000)
         # PseudoRandom，LowDiscrepancy，随机数发生器可用
         engine = ql.MCEuropeanEngine(self.process, 'PseudoRandom', timeSteps=self.exerciseDate-self.evaluationDate, antitheticVariate=True,
-                                     requiredSamples=requiredSamples, seed=seed)
+                                     requiredSamples=self.requiredSamples, seed=self.seed)
         return engine
 
     def delta(self, eps=EPS):
@@ -336,12 +342,18 @@ class AmericanOptionBSMFD(AmericanOptionBSMBinomial):
 
 # 连续分红股票美式期权的BSM蒙特卡洛定价模型
 class AmericanOptionBSMMonteCarlo(AmericanOptionBSMBinomial):
+    def __init__(self, stockPrice, strikePrice, evaluationDate, maturityDate, optionType, dividendRate, riskFree, volatility, seed=None, requiredSamples=MC_SAMPLE_NUMBER):
+        # MC参数设定
+        if seed is None:
+            self.seed = random.randint(0, 100000000)
+        else:
+            self.seed = seed
+        self.requiredSamples = requiredSamples
+        super().__init__(stockPrice, strikePrice, evaluationDate, maturityDate, optionType, dividendRate, riskFree, volatility)
+
     def getPricingEngine(self):
-        # MonteCarlo方法的参数
-        requiredSamples = MC_SAMPLE_NUMBER
-        seed = random.randint(0, 100000000)
         engine = ql.MCAmericanEngine(self.process, 'PseudoRandom', timeSteps=self.maturityDate-self.evaluationDate, antitheticVariate=True,
-                                     requiredSamples=requiredSamples, seed=seed)
+                                     requiredSamples=self.requiredSamples, seed=self.seed)
         return engine
 
     def delta(self, eps=EPS):
@@ -391,6 +403,9 @@ class DiscreteAveragingAsiannOption(Option):
         return runningAccumulator, pastFixings
 
     def _get_fixing_dates(self):
+        # 不包括self.evaluationDate
+        # 包括self.exerciseDate
+        # 中间的交易日全部包括
         fixingDates = []
         for i in range(self.calendar.businessDaysBetween(self.evaluationDate, self.exerciseDate)):
             fixingDates.append(self.calendar.advance(self.evaluationDate, i + 1, ql.Days))
@@ -399,8 +414,14 @@ class DiscreteAveragingAsiannOption(Option):
 
 # 离散平均价格亚式股票期权BSM定价模型-蒙特卡洛求解
 class DiscreteArithmeticAveragingPriceAsiannOptionBSMMonteCarlo(DiscreteAveragingAsiannOption):
-    def __init__(self, stockPrice, strikePrice, evaluationDate, exerciseDate, optionType, historyPrices, dividendRate, riskFree, volatility):
+    def __init__(self, stockPrice, strikePrice, evaluationDate, exerciseDate, optionType, historyPrices, dividendRate, riskFree, volatility, seed=None, requiredSamples=MC_SAMPLE_NUMBER):
         averageType = ql.Average.Arithmetic
+        # MC参数设定
+        if seed is None:
+            self.seed = random.randint(0, 100000000)
+        else:
+            self.seed = seed
+        self.requiredSamples = requiredSamples
         super().__init__(stockPrice, strikePrice, evaluationDate, exerciseDate, optionType, averageType, historyPrices)
         self.riskFree = ql.SimpleQuote(riskFree)
         self.volatility = ql.SimpleQuote(volatility)
@@ -425,10 +446,8 @@ class DiscreteArithmeticAveragingPriceAsiannOptionBSMMonteCarlo(DiscreteAveragin
 
     def getPricingEngine(self):
         # 'pseudorandom'为具体的RNG类型
-        # MonteCarlo方法的参数
-        requiredSamples = MC_SAMPLE_NUMBER
-        seed = random.randint(0, 100000000)
-        engine = ql.MCDiscreteArithmeticAPEngine(self.process, 'pseudorandom', antitheticVariate=True, requiredSamples=requiredSamples, seed=seed)
+        engine = ql.MCDiscreteArithmeticAPEngine(self.process, 'pseudorandom', antitheticVariate=True,
+                                                 requiredSamples=self.requiredSamples, seed=self.seed)
         return engine
 
     def NPV(self, stockPrice, dividendRate, riskFree, volatility):
@@ -451,8 +470,7 @@ class DiscreteArithmeticAveragingPriceAsiannOptionBSMMonteCarlo(DiscreteAveragin
         return NPVValue
 
     def value(self):
-        value = self.NPV(self.stockPrice.value(), self.dividendRate.value(), self.riskFree.value(),
-                         self.volatility.value())
+        value = self.NPV(self.stockPrice.value(), self.dividendRate.value(), self.riskFree.value(), self.volatility.value())
         return value
 
     def delta(self, eps=EPS):
@@ -465,7 +483,24 @@ class DiscreteArithmeticAveragingPriceAsiannOptionBSMMonteCarlo(DiscreteAveragin
         return delta
 
 
-if __name__ == '__main__':
+# 此处开始写测试函数
+# 也是使用说明
+
+def 欧式期权测试1():
+    # 盘中实时计算时，由于未到收盘时刻，evaluationDate为当天的前一个交易日
+    # 收盘盯市计算时，evaluationDate为当天
+    stockPrice = 1.0
+    strikePrice = 0.0
+    evaluationDate = '2019-02-27'
+    exerciseDate = '2019-02-27'
+    optionType = ql.Option.Call
+    riskFree = 0.01
+    volatility = 0.2
+    model = EuropeanOptionBSAnalytic(stockPrice, strikePrice, evaluationDate, exerciseDate, optionType, riskFree, volatility)
+    print(model.value())
+
+
+def 美式期权测试1():
     stockPrice = 100.0
     strikePrice = 100.0
     evaluationDate = '2014-03-07'
@@ -478,12 +513,29 @@ if __name__ == '__main__':
     print(model.value())
     print(model.delta())
 
-    stockPrice = 1.0
-    strikePrice = 0.0
-    evaluationDate = '2019-02-27'
-    exerciseDate = '2019-02-27'
+
+def 亚式期权测试1():
+    # historyPrices使用说明
+    # 模型计算中，不包括evaluationDate作为均值采样日，但包括exerciseDate
+    # 盘中实时报价时，由于即时的S价格不包含在计算的均值内，因此此时historyPrices=[]，且evaluationDate为当天的前一个交易日
+    # 收盘时盯市价格，evaluationDate为当天，historyPrices=[当天收盘价,]
+    # 其他日子计算时，以此类推，例如：
+    # 当日盘中实时计算，S=100.0，历史收盘价为[99.0, 102.0, 101.0]，则historyPrices=[99.0, 102.0, 101.0]，evaluationDate为当天的前一个交易日
+    # 当日收盘盯市价格，则historyPrices=[99.0, 102.0, 101.0, 当天收盘价]，evaluationDate为当天
+    stockPrice = 100.0
+    strikePrice = 100.0
+    evaluationDate = '2014-03-07'
+    exerciseDate = '2014-06-07'
     optionType = ql.Option.Call
+    historyPrices = [99.0, 98.7, 101.5, 101.4]
+    dividendRate = 0.0
     riskFree = 0.01
-    volatility = 0.2
-    model = EuropeanOptionBSAnalytic(stockPrice, strikePrice, evaluationDate, exerciseDate, optionType, riskFree, volatility)
+    volatility = 0.20
+    model = DiscreteArithmeticAveragingPriceAsiannOptionBSMMonteCarlo(stockPrice, strikePrice, evaluationDate, exerciseDate, optionType, historyPrices, dividendRate, riskFree, volatility)
     print(model.value())
+    print(model.delta())
+
+
+if __name__ == '__main__':
+    美式期权测试1()
+    亚式期权测试1()

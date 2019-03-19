@@ -53,49 +53,27 @@ class SingleAssetPathGeneratorByErerydayReturn(PathGenerator):
         # len(self.date_list)行，self.path_number)条路径
         # 收益率用每日对数收益率表示
         # 此函数为通过生成每日回报来生成路径的核心函数
+        # 第一个结果用来仿真资产的价格走势，第二个结果用来对冲计算，默认两个结果相同
         return_everyday = np.zeros((len(self.date_list), self.path_number))  # 每日价格不变
-        return return_everyday
+        return return_everyday, return_everyday
 
     def _get_path_everyday(self):
         # 此函数为通过生成每日价格变动来生成路径的核心函数
-        return_everyday = self._get_return_everyday()
+        return_everyday, return_everyday_for_hedging = self._get_return_everyday()
+        # 计算路径每日回报
         return_everyday = np.cumsum(return_everyday, axis=0)
         path_everyday = np.exp(return_everyday)
         path_everyday = pd.DataFrame(path_everyday, index=self.date_list)
-        return path_everyday
+        # 对冲路径每日回报
+        return_everyday_for_hedging = np.cumsum(return_everyday_for_hedging, axis=0)
+        path_everyday_for_hedging = np.exp(return_everyday_for_hedging)
+        path_everyday_for_hedging = pd.DataFrame(path_everyday_for_hedging, index=self.date_list)
+        return path_everyday, path_everyday_for_hedging
 
     def get_data(self):
         # 此函数返回结果
-        # 第一个结果用来仿真资产的价格走势，第二个结果用来对冲计算，默认两个结果相同
-        path_everyday = self._get_path_everyday()
-        return path_everyday, path_everyday
-
-
-class SingleAssetPathGeneratorByErerydayReturnDiffHedging(SingleAssetPathGeneratorByErerydayReturn):
-    def __init__(self, asset, asset_for_hedging, start_date, end_date, path_number):
-        super().__init__(asset, start_date, end_date, path_number)
-        self.asset_for_hedging = asset_for_hedging
-
-    def _get_return_everyday_for_hedging(self):
-        # len(self.date_list)行，self.path_number)条路径
-        # 收益率用每日对数收益率表示
-        # 此函数为通过生成每日回报来生成路径的核心函数
-        return_everyday = np.zeros((len(self.date_list), self.path_number))  # 每日价格不变
-        return return_everyday
-
-    def _get_path_everyday_for_hedging(self):
-        # 此函数为通过生成每日价格变动来生成路径的核心函数
-        return_everyday = self._get_return_everyday()
-        return_everyday = np.cumsum(return_everyday, axis=0)
-        path_everyday = np.exp(return_everyday)
-        path_everyday = pd.DataFrame(path_everyday, index=self.date_list)
-        return path_everyday
-
-    def get_data(self):
-        # 此函数返回结果
-        # 第一个结果用来仿真资产的价格走势，第二个结果用来对冲计算，默认两个结果不同
-        path_everyday = self._get_path_everyday()
-        path_everyday_for_hedging = self._get_path_everyday_for_hedging()
+        # 第一个结果用来仿真资产的价格走势，第二个结果用来对冲计算
+        path_everyday, path_everyday_for_hedging = self._get_path_everyday()
         return path_everyday, path_everyday_for_hedging
 
 
@@ -135,7 +113,19 @@ class HistoryReturnPathGeneratorByEverydayReturn(SingleAssetPathGeneratorByErery
 
     def _get_return_everyday(self):
         return_everyday = self._get_return_everyday_by_asset(self.asset)
-        return return_everyday
+        return return_everyday, return_everyday
+
+
+class HistoryReturnPathGeneratorByEverydayReturnDiffHedging(HistoryReturnPathGeneratorByEverydayReturn):
+    def __init__(self, asset, asset_for_hedging, start_date, end_date, path_number, history_end_date, history_frequrncy=0):
+        # asset_for_hedging表示用于对冲回测的路径
+        self.asset_for_hedging = asset_for_hedging
+        super().__init__(asset, start_date, end_date, path_number, history_end_date, history_frequrncy)
+
+    def _get_return_everyday(self):
+        return_everyday = self._get_return_everyday_by_asset(self.asset)
+        return_everyday_for_hedging = self._get_return_everyday_by_asset(self.asset_for_hedging)
+        return return_everyday, return_everyday_for_hedging
 
 
 class BrownianMCReturnPathGeneratorByEverydayReturn(SingleAssetPathGeneratorByErerydayReturn):
@@ -164,5 +154,19 @@ def 每日历史回报路径测试1():
     print(sim_path_for_hedging)
 
 
+def 每日历史回报路径测试2():
+    # 计算路径与对冲路径不同
+    asset = '000300.SH'
+    asset_for_hedging = '000016.SH'
+    start_date = '2018-09-14'
+    end_date = '2018-10-12'
+    history_end_date = '2018-10-12'
+    path_number = 10
+    generator = HistoryReturnPathGeneratorByEverydayReturnDiffHedging(asset, asset_for_hedging, start_date, end_date, path_number, history_end_date)
+    sim_path, sim_path_for_hedging = generator.get_data()
+    print(sim_path)
+    print(sim_path_for_hedging)
+
+
 if __name__ == '__main__':
-    每日历史回报路径测试1()
+    每日历史回报路径测试2()

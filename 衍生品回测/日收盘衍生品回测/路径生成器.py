@@ -139,7 +139,7 @@ class BrownianMCReturnPathGeneratorByEverydayReturn(SingleAssetPathGeneratorByEr
     def _get_return_everyday(self):
         return_everyday = np.random.normal(self.drift, self.volatility, size=(len(self.date_list), self.path_number))
         return_everyday[0, :] = 0.0
-        return return_everyday
+        return return_everyday, return_everyday
 
 
 def 每日历史回报路径测试1():

@@ -13,7 +13,8 @@ class SingleAssetDerivativeBacktestDayBase(object):
         self.start_date = start_date  # 回测开始日期，此时刻的asset的价格为1
         self.end_date = end_date  # 回测到期日，也是期权的到期日
         # 生成仿真价格路径
-        self.simPaths = PathGenerator(asset, start_date, end_date, **coefsOfPathGenerator).get_data()
+        # self.simPaths表示计算标的的价格走势，self.simPathsHedging表示对冲标的的价格走势
+        self.simPaths, self.simPathsHedging = PathGenerator(asset, start_date, end_date, **coefsOfPathGenerator).get_data()
         self.date_list = [self.date2str(d) for d in list(self.simPaths.index.values)]
         # 衍生品与其用到的其它参数
         self.Derivative = Derivative
@@ -24,7 +25,7 @@ class SingleAssetDerivativeBacktestDayBase(object):
 
     def get_hedging_profit_and_loss(self):
         # 计算对冲和行权造成的衍生品盈亏
-        hedging_profit_and_loss = np.zeros((self.simPaths.shape[0]-1, self.simPaths.shape[1]))
+        hedging_profit_and_loss = np.zeros((self.simPathsHedging.shape[0]-1, self.simPathsHedging.shape[1]))
         return hedging_profit_and_loss
 
     def summary(self):
@@ -83,10 +84,10 @@ class SingleAssetDerivativeBacktestDeltaHedging4EuropeanOption(SingleAssetDeriva
     def get_hedging_profit_and_loss(self):
         asset_delta = self.get_asset_delta()
         payoff = self.get_payoff()
-        hedging_profit_and_loss = np.zeros_like(self.simPaths.values)
-        hedging_profit_and_loss[1:] = np.diff(self.simPaths.values, axis=0) * asset_delta[0:-1, :]  # delta对冲的盈亏
+        hedging_profit_and_loss = np.zeros_like(self.simPathsHedging.values)
+        hedging_profit_and_loss[1:] = np.diff(self.simPathsHedging.values, axis=0) * asset_delta[0:-1, :]  # delta对冲的盈亏
         asset_delta_delta = np.diff(np.r_[np.ones((1, asset_delta.shape[1])), asset_delta], axis=0)  # 每日调仓量
-        hedging_profit_and_loss -= (np.abs(self.simPaths.values * asset_delta_delta) * self.slippage * self.commission)  # delta对冲盈亏加入手续费影响
+        hedging_profit_and_loss -= (np.abs(self.simPathsHedging.values * asset_delta_delta) * self.slippage * self.commission)  # delta对冲盈亏加入手续费影响
         hedging_profit_and_loss[-1] = hedging_profit_and_loss[-1] - payoff  # payoff的支出
         return asset_delta, hedging_profit_and_loss, payoff
 

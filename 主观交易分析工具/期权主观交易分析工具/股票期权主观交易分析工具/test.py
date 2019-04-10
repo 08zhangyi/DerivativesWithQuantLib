@@ -7,7 +7,7 @@ from WindPy import w
 import datetime
 
 w.start()
-code = '10001546.SH'
+code = '10001755.SH'
 # 获取最新成交价，买一价，卖一价
 data = [temp[0] for temp in w.wsq(code, "rt_latest,rt_bid1,rt_ask1").Data]
 print(data)

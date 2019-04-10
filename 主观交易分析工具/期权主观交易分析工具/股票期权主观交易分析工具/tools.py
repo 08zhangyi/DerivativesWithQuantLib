@@ -72,7 +72,7 @@ class ETF50OptionAnalysis(OptionAnalysisBase):
         strike_list = []
         # 将期权的payoff转化为ql中的对象
         for option in self.options:
-            number = options[option]
+            number = self.options[option]
             option_data = w.wss(option, "exe_mode,exe_price,exe_ratio,lasttradingdate", "tradeDate=" + self.date_now).Data
             option_type = option_data[0][0]
             option_strike = option_data[1][0]
@@ -110,7 +110,7 @@ class ETF50OptionAnalysis(OptionAnalysisBase):
         for option in self.ql_options:
             payoff_function, volume = self.ql_options[option]
             payoff += payoff_function(price) * volume
-        payoff += etf * price
+        payoff += self.etf * price
         payoff /= self.unit
         return payoff
 
@@ -159,9 +159,30 @@ class ETF50OptionAnalysis(OptionAnalysisBase):
         plt.show()
 
 
-if __name__ == '__main__':
-    options = {'10001369.SH': -1}
-    etf = 10200
-    unit = 10200
+# 使用模板区
+def 备兑开仓():
+    options = {'10001755.SH': -1}
+    etf = 10000
+    unit = 10000
     tool = ETF50OptionAnalysis(options, etf=etf, unit=unit)
     tool.summary()
+
+
+def 牛市价差_Call():
+    options = {'10001755.SH': 1, '10001759.SH': -1}
+    etf = 0
+    unit = 10000
+    tool = ETF50OptionAnalysis(options, etf=etf, unit=unit)
+    tool.summary()
+
+
+def 蝶式价差_Call():
+    options = {'10001756.SH': 1, '10001758.SH': -2, '10001769.SH': 1}
+    etf = 0
+    unit = 10000
+    tool = ETF50OptionAnalysis(options, etf=etf, unit=unit)
+    tool.summary()
+
+
+if __name__ == '__main__':
+    蝶式价差_Call()

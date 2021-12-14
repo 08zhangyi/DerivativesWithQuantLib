@@ -44,7 +44,7 @@ def spread_option_income_certificate(start_date, end_date, underlying_index, und
     N = N.days
     # 计算保证基础收益率时的可购买期权组合的资金量
     option_available = principle - principle * (1 + basic_return_rate * N / 365) / (1 + fixed_return_rate * N / 365)
-    print('产品发行日为%s，产品到期日为%s，一共%i个自然日，产品发行规模为%.2f元，给定的同期固定收益产品利率为%.2f%%' % (start_date, end_date, N, principle, fixed_return_rate*100))
+    print('\n产品发行日为%s，产品到期日为%s，一共%i个自然日，产品发行规模为%.2f元，给定的同期固定收益产品利率为%.2f%%' % (start_date, end_date, N, principle, fixed_return_rate*100))
     print('可购买期权的资金为：%.2f元' % option_available)
 
     # 产品理论到期日收益情况
@@ -68,8 +68,8 @@ def spread_option_income_certificate(start_date, end_date, underlying_index, und
     else:
         raise Exception("非法的期权类型")
     # 计算最佳情形期权投资的总盈亏
-    bull_spread_max = (asset_higher - asset_lower) * option_number * option_portfolio_buy  # 期权投资最大收益率
-    return_max = (bull_spread_max / principle) * 365 / N  # 年化期权投资最大收益率
+    spread_option_max = (asset_higher - asset_lower) * option_number * option_portfolio_buy  # 期权投资最大收益率
+    return_max = (spread_option_max / principle) * 365 / N  # 年化期权投资最大收益率
     participate_ratio = return_max / ((index_higher - index_lower) / underlying_index_start)
     print('\n产品下限年化收益率为：%.4f%%\n产品上限年化收益率为：%.4f%%\n产品年化参与率为：%.4f%%' % (basic_return_rate*100, return_max*100+basic_return_rate*100, participate_ratio*100))
 

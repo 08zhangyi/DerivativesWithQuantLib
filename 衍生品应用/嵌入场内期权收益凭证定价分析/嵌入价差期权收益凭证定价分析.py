@@ -9,7 +9,7 @@ def get_option_portfolio_value_from_Wind(option_portfolio, date):
     option_portfoio_b = w.wss(option_portfolio['B'], "close,exe_ratio,exe_price,exe_mode", "tradeDate="+date+";priceAdj=U;cycle=D").Data
     option_portfoio_s = w.wss(option_portfolio['S'], "close,exe_ratio,exe_price,exe_mode", "tradeDate="+date+";priceAdj=U;cycle=D").Data
     # print(option_portfoio_b, option_portfoio_s)
-    value = option_portfoio_b[0][0] * option_portfoio_b[1][0] - option_portfoio_s[0][0] * option_portfoio_s[1][0]
+    value = option_portfoio_b[0][0] * option_portfoio_b[1][0] - option_portfoio_s[0][0] * option_portfoio_s[1][0]  # 单张期权组合价值
     number = option_portfoio_b[1][0]
     if option_portfoio_b[3][0] == '认购':
         spread_type = 'BULL'
@@ -33,7 +33,7 @@ def spread_option_income_certificate(start_date, end_date, underlying_index, und
     :param underlying_index: 挂钩标的指数
     :param underlying_asset: 挂钩对应投资资产
     :param basic_return_rate: 产品基础收益率（最低收益率；年化，下同）
-    :param bull_spread: 牛市价差期权构成
+    :param spread_options: 价差期权构成，支持看涨牛市价差或看跌熊市价差
     :param principle:
     # 市场参数特征
     :param fix_return_rate: 相同期限固定收益产品收益率
@@ -94,7 +94,7 @@ if __name__ == "__main__":
     UNDERLYING_ASSET = '510300.SH'  # 挂钩对应投资资产
     BASIC_RATE_RATE = 0.015  # 产品基础收益率（最低收益率；年化，下同）
     BULL_SPREADS = {'B': '10003600.SH', 'S': '10003604.SH'}  # 牛市价差期权构成
-    BEAR_SPREADS = {'B': '10003613.SH', 'S': '10003609.sh'}
+    BEAR_SPREADS = {'B': '10003613.SH', 'S': '10003609.sh'}  # 熊市价差期权构成
     PRINCIPLE = 10000000
     # 市场参数特征
     FIXED_RETURN_RATE = 0.032  # 相同期限固定收益产品收益率

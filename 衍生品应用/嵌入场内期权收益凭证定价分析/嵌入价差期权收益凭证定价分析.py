@@ -37,7 +37,16 @@ def spread_option_income_certificate(start_date, end_date, underlying_index, und
     :param principle:
     # 市场参数特征
     :param fix_return_rate: 相同期限固定收益产品收益率
-    :return:
+    :return: floating_bottom_point: 浮动下限点位
+             floating_bottom_ratio: 浮动下限比例
+             floating_ceiling_point: 浮动上限点位
+             floating_ceiling_ratio: 浮动上限比例
+             bottom_return: 下限收益率
+             ceiling_return: 上限收益率
+             participate_ratio: 参与率
+             underlying_index_end: 到期日指数
+             return_rate_end: 到期日产品收益率
+             hedge_value: 对冲收入（元）
     '''
     # 计算单利计息天数
     N = datetime.datetime.strptime(end_date, '%Y-%m-%d') - datetime.datetime.strptime(start_date, '%Y-%m-%d')
@@ -61,10 +70,18 @@ def spread_option_income_certificate(start_date, end_date, underlying_index, und
         print('\n挂钩指数：%s，%s日收盘点位：%.2f点（100%%）' % (underlying_index, start_date, underlying_index_start),
               '\n浮动下限对应指数：%.2f点（%.2f%%）' % (index_lower, index_lower/underlying_index_start*100),
               '\n浮动上限对应指数：%.2f点（%.2f%%）' % (index_higher, index_higher/underlying_index_start*100))
+        floating_bottom_point = index_lower
+        floating_bottom_ratio = index_lower/underlying_index_start
+        floating_ceiling_point = index_higher
+        floating_ceiling_ratio = index_higher/underlying_index_start
     elif spread_type == 'BEAR':
         print('\n挂钩指数：%s，%s日收盘点位：%.2f点（100%%）' % (underlying_index, start_date, underlying_index_start),
               '\n浮动下限对应指数：%.2f点（%.2f%%）' % (index_higher, index_higher/underlying_index_start*100),
               '\n浮动上限对应指数：%.2f点（%.2f%%）' % (index_lower, index_lower / underlying_index_start * 100))
+        floating_bottom_point = index_higher
+        floating_bottom_ratio = index_higher/underlying_index_start
+        floating_ceiling_point = index_lower
+        floating_ceiling_ratio = index_lower / underlying_index_start
     else:
         raise Exception("非法的期权类型")
     # 计算最佳情形期权投资的总盈亏
@@ -85,6 +102,13 @@ def spread_option_income_certificate(start_date, end_date, underlying_index, und
     print('\n到期日%s挂钩指数为：%.2f点，产品到期年化收益率为：%.4f%%' % (end_date, underlying_index_end, return_rate*100+basic_return_rate*100))
     print('产品投资对冲收入为：%.2f元' % hedge_value)
 
+    bottom_return = basic_return_rate
+    ceiling_return = return_max+basic_return_rate
+    return_rate_end = return_rate+basic_return_rate
+    participate_ratio = participate_ratio
+    return floating_bottom_point, floating_bottom_ratio, floating_ceiling_point, floating_ceiling_ratio, \
+           bottom_return, ceiling_return, participate_ratio, underlying_index_end, return_rate_end, hedge_value
+
 
 if __name__ == "__main__":
     # 产品基本特征
@@ -94,10 +118,10 @@ if __name__ == "__main__":
     UNDERLYING_ASSET = '510300.SH'  # 挂钩对应投资资产
     BASIC_RATE_RATE = 0.015  # 产品基础收益率（最低收益率；年化，下同）
     BULL_SPREADS = {'B': '10003600.SH', 'S': '10003604.SH'}  # 牛市价差期权构成
-    BEAR_SPREADS = {'B': '10003613.SH', 'S': '10003609.sh'}  # 熊市价差期权构成
+    BEAR_SPREADS = {'B': '10003613.SH', 'S': '10003609.SH'}  # 熊市价差期权构成
     PRINCIPLE = 10000000
     # 市场参数特征
     FIXED_RETURN_RATE = 0.032  # 相同期限固定收益产品收益率
 
-    spread_option_income_certificate(START_DATE, END_DATE, UNDERLYING_INDEX, UNDERLYING_ASSET, BASIC_RATE_RATE,
-                                     BEAR_SPREADS, PRINCIPLE, FIXED_RETURN_RATE)
+    print(spread_option_income_certificate(START_DATE, END_DATE, UNDERLYING_INDEX, UNDERLYING_ASSET, BASIC_RATE_RATE,
+                                           BULL_SPREADS, PRINCIPLE, FIXED_RETURN_RATE))
